@@ -1,11 +1,11 @@
 package com.crud.demo.controller;
 
 import java.util.List;
+import java.util.Optional;
 
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.crud.demo.dao.EmployeeDAO;
+import com.crud.demo.exception.MissingParameterException;
+import com.crud.demo.exception.ResourceNotFoundException;
 import com.crud.demo.model.Employee;
 
 @RestController
@@ -24,50 +26,65 @@ public class EmployeeController {
 
 	@Autowired
 	EmployeeDAO employeeDAO;
-	
+
 	@PostMapping("/employees")
-	public Employee createEmployee(@Valid @RequestBody Employee emp) {
+	public Employee createEmployee(@RequestBody Employee emp) throws Exception {
+		
+		if (emp.getEmailId() == null || emp.getEmailId().isEmpty())
+			throw new MissingParameterException("EmailId can't be null");
+		
+		if (emp.getFirstName() == null || emp.getFirstName().isEmpty())
+			throw new MissingParameterException("First name can't be null");
+		
+		if (emp.getLastName() == null || emp.getLastName().isEmpty())
+			throw new MissingParameterException("Last name can't be null");
+		
 		return employeeDAO.save(emp);
 	}
-	
+
 	@GetMapping("/employees")
-	public List<Employee> getAllEmployees() {
+	public List<Employee> getAllEmployees() throws Exception {
 		return employeeDAO.findAll();
 	}
-	
+
 	@GetMapping("/employees/{id}")
-	public ResponseEntity<Employee> getEmployeeById(@PathVariable(value="id") Long empid) {
-		Employee emp = employeeDAO.findOne(empid);
-		
-		if (emp == null) {
-			return ResponseEntity.notFound().build();
-		}
-		return ResponseEntity.ok().body(emp);
+	public Employee getEmployeeById(@PathVariable("id") Long empid) throws Exception {
+			Optional<Employee> emp = employeeDAO.findOne(empid);
+			
+			if (!emp.isPresent())
+				throw new ResourceNotFoundException("Employee not found");
+
+			return emp.get();
 	}
-	
+
 	@PutMapping("/employees/{id}")
-	public ResponseEntity<Employee> updateEmployeeById(@PathVariable(value="id") Long empid, @Valid @RequestBody Employee empDetails) {
-		Employee emp = employeeDAO.findOne(empid);
-		if (emp == null) {
-				return ResponseEntity.notFound().build();
-		}
-		emp.setFirstName(empDetails.getFirstName());
-		emp.setLastName(empDetails.getLastName());
-		emp.setEmailId(empDetails.getEmailId());
-		
-		Employee updatedEmployee = employeeDAO.save(emp);
-		return ResponseEntity.ok().body(updatedEmployee);
+	public Employee updateEmployeeById(@RequestBody Employee empDetails, @PathVariable("id") Long empid) throws Exception {
+
+		Optional<Employee> emp = employeeDAO.findOne(empid);
+
+		if (!emp.isPresent())
+			throw new ResourceNotFoundException("Employee not found");
+
+		if (empDetails.getFirstName() == null || empDetails.getFirstName().isEmpty())
+			empDetails.setFirstName(emp.get().getFirstName());
+
+		if (empDetails.getLastName() == null || empDetails.getLastName().isEmpty())
+			empDetails.setLastName(emp.get().getLastName());
+
+		if (empDetails.getEmailId() == null || empDetails.getEmailId().isEmpty())
+			empDetails.setEmailId(emp.get().getEmailId());
+
+		empDetails.setId(empid);
+
+		return employeeDAO.save(empDetails);
 	}
-	
+
 	@DeleteMapping("/employees/{id}")
-	public ResponseEntity<Employee> deleteEmployee(@PathVariable(value="id") Long empid) {
-		Employee emp = employeeDAO.findOne(empid);
-		if (emp == null) {
-			return ResponseEntity.notFound().build();
-		}
-		
-		employeeDAO.delete(emp);
-		return ResponseEntity.ok().build();
+	public void deleteEmployee(@PathVariable("id") Long empid) throws Exception {
+			Optional<Employee> emp = employeeDAO.findOne(empid);
+			if (!emp.isPresent())
+				throw new Exception("Employee not found");
+
+			employeeDAO.deleteById(empid);
 	}
 }
-
